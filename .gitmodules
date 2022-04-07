@@ -1,0 +1,3 @@
+[submodule "torchphysics"]
+	path = torchphysics
+	url = https://github.com/boschresearch/torchphysics.git

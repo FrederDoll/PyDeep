@@ -202,7 +202,7 @@ def Sine():
                         label='Physics loss training locations')
         l = plt.legend(loc=(1.01, 0.34), frameon=False, fontsize="large")
         plt.setp(l.get_texts(), color="k")
-        plt.xlim(0, 1)
+        plt.xlim(0, 20)
         plt.ylim(-1.1, 1.1)
         plt.text(1.065, 0.7, "Training step: %i" % (i + 1), fontsize="xx-large", color="k")
         plt.axis("off")
@@ -230,31 +230,32 @@ def Sine():
     ##Generate Training Data:
 
     # get the analytical solution over the full domain
-    x = torch.linspace(0, 15, 1000).view(-1, 1)
+    x = torch.linspace(0, 20, 1000).view(-1, 1)
     #y = oscillator(d, w0, x).view(-1, 1)
     y=torch.sin(x).view(-1, 1)
     print(x.shape, y.shape)
 
     # slice out a small number of points from the LHS of the domain
-    x_data = x[0:250:20]
-    y_data = y[0:250:20]
-    print(x_data.shape, y_data.shape)
+    x_data = x[0:400:50]
+    y_data = y[0:400:50]
+    #print(x_data.shape, y_data.shape)
 
     plt.figure()
     plt.plot(x, y, label="Exact solution")
     plt.scatter(x_data, y_data, color="tab:orange", label="Training data")
+
+
+    # sample locations over the problem domain
+    x_physics = torch.linspace(0, 3*2*math.pi, 50).view(-1, 1).requires_grad_(True)
+    plt.scatter(x_physics.detach().numpy(),torch.ones_like(x_physics)*0,color="tab:green", label="x_Physiks")
     plt.legend()
     plt.show()
-
-
-    x_physics = torch.linspace(0, 1, 30).view(-1, 1).requires_grad_(True)  # sample locations over the problem domain
-
 
     torch.manual_seed(123)
     model = FCN(1, 1, 32, 3)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     files = []
-    for i in range(20000):
+    for i in range(100000):
         optimizer.zero_grad()
 
         # compute the "data loss"
@@ -267,7 +268,7 @@ def Sine():
         dx2 = torch.autograd.grad(dx, x_physics, torch.ones_like(dx), create_graph=True)[0]  # computes d^2y/dx^2
         #Todo: get back here and talk about pyhsiks!
         physics = dx2 + yhp  # computes the residual of the  SINE differential equation
-        loss2 = (1e-4) * torch.mean(physics ** 2)
+        loss2 = torch.mean(physics ** 2)
         #Todo: lets talk about the (1e-4) * torch.mean(physics ** 2)
 
         # backpropagate joint loss
@@ -298,4 +299,4 @@ def Sine():
 if __name__ == '__main__':
     print("hello world")
     Sine()
-    #print(torch.cuda.is_available())
+    print(torch.cuda.is_available())

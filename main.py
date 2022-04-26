@@ -5,11 +5,12 @@ import numpy as np
 # Press the green button in the gutter to run the script.
 
 import torch
-import torchphysics as tp
+#import torchphysics as tp
 import math
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 from fdm_heat_equation import FDM, transform_to_points
+from tqdm import tqdm
 
 import os
 
@@ -22,7 +23,7 @@ import numpy as np
 import requests
 
 
-
+"""""
 def firstTry():
     print('This is the first try of torchphysiks')
 
@@ -177,7 +178,7 @@ def secondTry():
     ax.set_ylabel('$\Psi(x)$')
     plt.legend(loc='best');
     plt.show()
-
+"""
 def Sine():
 
     print("we want to dolfe the DE: x''=-x, x(0)=0,x'(0)=1")
@@ -202,9 +203,9 @@ def Sine():
                         label='Physics loss training locations')
         l = plt.legend(loc=(1.01, 0.34), frameon=False, fontsize="large")
         plt.setp(l.get_texts(), color="k")
-        plt.xlim(0, 20)
+        plt.xlim(0, 40)
         plt.ylim(-1.1, 1.1)
-        plt.text(1.065, 0.7, "Training step: %i" % (i + 1), fontsize="xx-large", color="k")
+        plt.text(1.065, 0.7, "Training step: %i" % (i + 1)+"loss:"%loss, fontsize="xx-large", color="k")
         plt.axis("off")
 
     class FCN(nn.Module):
@@ -228,12 +229,18 @@ def Sine():
             x = self.fce(x)
             return x
     ##Generate Training Data:
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        print("using GPU")
+    else:
+        device = torch.device("cpu")
+        print("using CPU")
 
     # get the analytical solution over the full domain
-    x = torch.linspace(0, 20, 1000).view(-1, 1)
+    x = torch.linspace(0, 50, 10000).view(-1, 1).to(device)
     #y = oscillator(d, w0, x).view(-1, 1)
-    y=torch.sin(x).view(-1, 1)
-    print(x.shape, y.shape)
+    y=torch.sin(x).view(-1, 1).to(device)
+    #print(x.shape, y.shape)
 
     # slice out a small number of points from the LHS of the domain
     x_data = x[0:400:50]
@@ -241,21 +248,23 @@ def Sine():
     #print(x_data.shape, y_data.shape)
 
     plt.figure()
-    plt.plot(x, y, label="Exact solution")
-    plt.scatter(x_data, y_data, color="tab:orange", label="Training data")
+    plt.plot(x.cpu(), y.cpu(), label="Exact solution")
+    plt.scatter(x_data.cpu(), y_data.cpu(), color="tab:orange", label="Training data")
 
 
     # sample locations over the problem domain
     x_physics = torch.linspace(0, 3*2*math.pi, 50).view(-1, 1).requires_grad_(True)
+
     plt.scatter(x_physics.detach().numpy(),torch.ones_like(x_physics)*0,color="tab:green", label="x_Physiks")
     plt.legend()
     plt.show()
-
+    x_physics = x_physics.cuda()
     torch.manual_seed(123)
-    model = FCN(1, 1, 32, 3)
+    model = FCN(1, 1, 32, 3).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     files = []
-    for i in range(100000):
+    for i in tqdm(range(100000)):
+
         optimizer.zero_grad()
 
         # compute the "data loss"
@@ -270,9 +279,11 @@ def Sine():
         physics = dx2 + yhp  # computes the residual of the  SINE differential equation
         loss2 = torch.mean(physics ** 2)
         #Todo: lets talk about the (1e-4) * torch.mean(physics ** 2)
-
+        #Todo us lamda on Loss
         # backpropagate joint loss
-        loss = loss1 + loss2  # add two loss terms together
+        #Todo whts up if there is no training loss
+        loss = loss1 +  loss2  # add two loss terms together
+
         loss.backward()
         optimizer.step()
 
@@ -282,11 +293,12 @@ def Sine():
             yh = model(x).detach()
             xp = x_physics.detach()
 
-            plot_result(x, y, x_data, y_data, yh, xp)
+            plot_result(x.cpu(), y.cpu(), x_data.cpu(), y_data.cpu(), yh.cpu(), xp.cpu())
 
             file = "plots/pinn_%.8i.png" % (i + 1)
             plt.savefig(file, bbox_inches='tight', pad_inches=0.1, dpi=100, facecolor="white")
             files.append(file)
+            print("Loss bei Iteration",i,"ist: ",loss)
 
             if (i + 1) % 6000 == 0:
                 plt.show()
@@ -298,5 +310,9 @@ def Sine():
 
 if __name__ == '__main__':
     print("hello world")
+    print("version of Torch:",torch.__version__)
+    #torch.cuda.is_available()
     Sine()
-    print(torch.cuda.is_available())
+    #pinn_sine.start
+
+    print("is cuda availiabel?",torch.cuda.is_available())
